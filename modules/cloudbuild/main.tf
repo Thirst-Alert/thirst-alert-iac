@@ -14,7 +14,7 @@ resource "google_cloudbuildv2_connection" "cloudbuild_repo_connection" {
 resource "google_cloudbuildv2_repository" "thirst_alert_be" {
   name = "thirst-alert-be"
   parent_connection = google_cloudbuildv2_connection.cloudbuild_repo_connection.id
-  remote_uri = "https://github.com/Thirst-Alert/thirst-alert-be.git"
+  remote_uri = "https://github.com/thirst-alert/thirst-alert-be.git"
 }
 
 resource "google_cloudbuild_trigger" "backend-trigger" {
