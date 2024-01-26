@@ -49,5 +49,3 @@ resource "google_secret_manager_secret" "mongodb_db_password_secret" {
 data "google_secret_manager_secret_version" "mongodb_db_password_secret_version" {
   secret = google_secret_manager_secret.mongodb_db_password_secret.secret_id
 }
-
-#?`=rN*1ryFxC8K81
