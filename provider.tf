@@ -8,8 +8,6 @@ terraform {
 }
 
 provider "google" {
-  credentials = file("creds.json")
-
   project = "thirst-alert"
   region  = "europe-west3"
   zone    = "europe-west3-b"
