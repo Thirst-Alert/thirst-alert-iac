@@ -17,11 +17,18 @@ resource "google_cloudbuildv2_repository" "thirst_alert_be" {
   remote_uri = "https://github.com/thirst-alert/thirst-alert-be.git"
 }
 
+resource "google_artifact_registry_repository" "my-repo" {
+  location      = "europe-west3"
+  repository_id = "thirst-alert-be"
+  description   = "A repository for thirst-alert backend artifacts."
+  format        = "DOCKER"
+  # ADD CLEANUP POLICIES
+}
+
 resource "google_cloudbuild_trigger" "backend-trigger" {
 	name = "thirst-alert-be"
 	description = "Trigger for thirst-alert backend build"
   location = "europe-west3"
-	disabled = true
 
   repository_event_config {
     repository = google_cloudbuildv2_repository.thirst_alert_be.id

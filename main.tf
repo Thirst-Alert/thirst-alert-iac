@@ -18,6 +18,13 @@ module "cloudbuild" {
   depends_on = [module.iam]
 }
 
+module "gke" {
+  source = "./modules/gke"
+
+  project    = local.project
+  # depends_on = [module.iam]
+}
+
 module "mongo" {
   source = "./modules/mongo"
 

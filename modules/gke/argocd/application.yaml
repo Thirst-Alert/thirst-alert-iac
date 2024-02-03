@@ -1,0 +1,11 @@
+project: dev
+source:
+  repoURL: 'git@github.com:thirst-alert/thirst-alert-iac'
+  path: 'modules/gke/argocd/be'
+  targetRevision: HEAD
+destination:
+  server: https://kubernetes.default.svc
+syncPolicy:
+  automated:
+    prune: false
+    selfHeal: false
