@@ -136,6 +136,7 @@ resource "argocd_application" "backend" {
         prune = true
         self_heal = true
       }
+      sync_options = ["CreateNamespace=True"]
     }
   }
 }
