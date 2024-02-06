@@ -154,7 +154,7 @@ resource "argocd_application" "mongo" {
       chart           = "mongodb"
       target_revision = "14.8.0"
       helm {
-        value_files = ["$values/modules/gke/argocd/be/mongo-values.yaml"]
+        value_files = ["$values/modules/gke/argocd/mongo/mongo-values.yaml"]
       }
     }
 
