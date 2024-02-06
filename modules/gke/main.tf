@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    argocd = {
+      source = "oboukili/argocd"
+      version = "6.0.3"
+    }
+  }
+}
+
 resource "google_container_cluster" "thirst_alert_dev_cluster" {
   name                     = "${var.project.project_id}-dev"
   deletion_protection = false
@@ -63,3 +72,101 @@ resource "helm_release" "argocd" {
 
 #   depends_on = [helm_release.argocd]
 # }
+
+provider "argocd" {
+  core = true
+}
+
+resource "argocd_repository" "thirst_alert_iac_repo" {
+  repo = "https://github.com/thirst-alert/thirst-alert-iac.git"
+}
+
+resource "argocd_project" "thirst_alert_argocd_project" {
+  metadata {
+    name = "thirst-alert"
+    namespace = "argocd"
+  }
+
+  spec {
+    description = "Thirst Alert IAC Project"
+    source_namespaces = ["ta-*"]
+    source_repos = [
+      argocd_repository.thirst_alert_iac_repo.repo
+    ]
+    destination {
+      server = "https://kubernetes.default.svc"
+      namespace = "ta-backend"
+    }
+    role {
+      name = "admin"
+      policies = [
+        "p, proj:thirst-alert:admin, applications, override, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, applications, sync, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, clusters, get, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, repositories, create, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, repositories, delete, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, repositories, update, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, logs, get, thirst-alert/*, allow",
+        "p, proj:thirst-alert:admin, exec, create, thirst-alert/*, allow",
+      ]
+    }
+
+  }
+}
+
+resource "argocd_application" "backend" {
+  metadata {
+    name = "backend"
+    namespace = "argocd"
+  }
+  spec {
+    project = "thirst-alert"
+    source {
+      repo_url = argocd_repository.thirst_alert_iac_repo.repo
+      path = "modules/gke/argocd/be"
+      target_revision = "HEAD"
+    }
+    destination {
+      server = "https://kubernetes.default.svc"
+      namespace = "ta-backend"
+    }
+    sync_policy {
+      automated {
+        prune = true
+        self_heal = true
+      }
+    }
+  }
+}
+
+resource "argocd_application" "mongo" {
+  metadata {
+    name      = "mongo"
+    namespace = "argocd"
+  }
+
+  spec {
+    project = "thirst-alert"
+
+    source {
+      repo_url        = "https://charts.bitnami.com/bitnami"
+      chart           = "mongodb"
+      target_revision = "14.8.0"
+      helm {
+        value_files = ["$values/modules/gke/argocd/be/mongo-values.yaml"]
+      }
+    }
+
+    source {
+      repo_url        = argocd_repository.thirst_alert_iac_repo.repo
+      target_revision = "HEAD"
+      ref             = "values"
+    }
+
+    destination {
+      server    = "https://kubernetes.default.svc"
+      namespace = "ta-backend"
+    }
+  }
+}
+
