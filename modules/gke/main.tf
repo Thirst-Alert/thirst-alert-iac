@@ -91,7 +91,8 @@ resource "argocd_project" "thirst_alert_argocd_project" {
     description = "Thirst Alert IAC Project"
     source_namespaces = ["ta-*"]
     source_repos = [
-      argocd_repository.thirst_alert_iac_repo.repo
+      argocd_repository.thirst_alert_iac_repo.repo,
+      "https://charts.bitnami.com/bitnami"
     ]
     destination {
       server = "https://kubernetes.default.svc"
