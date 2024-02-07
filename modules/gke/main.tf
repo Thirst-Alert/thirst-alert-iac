@@ -4,6 +4,14 @@ terraform {
       source = "oboukili/argocd"
       version = "6.0.3"
     }
+    kubernetes = {
+      source = "hashicorp/kubernetes"
+      version = "2.25.2"
+    }
+    # kubectl = {
+    #   source  = "gavinbunney/kubectl"
+    #   version = ">= 1.7.0"
+    # }
   }
 }
 
@@ -40,6 +48,53 @@ module "gke_auth" {
   depends_on           = [google_container_cluster.thirst_alert_dev_cluster]
 }
 
+# provider "kubectl" {
+#   host                   = module.gke_auth.host
+#   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
+#   token                  = module.gke_auth.token
+#   load_config_file       = false
+# }
+
+# data "kubectl_file_documents" "be_namespace_doc" {
+#     content = file("${path.module}/k8s/be-namespace.yaml")
+# }
+
+# resource "kubectl_manifest" "be_namespace" {
+#     count     = length(data.kubectl_file_documents.be_namespace_doc.documents)
+#     yaml_body = element(data.kubectl_file_documents.be_namespace_doc.documents, count.index)
+#     override_namespace = "ta-backend"
+# }
+
+provider "kubernetes" {
+  cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
+  host                   = module.gke_auth.host
+  token                  = module.gke_auth.token
+}
+
+resource "kubernetes_namespace" "ta_backend_namespace" {
+  metadata {
+    name = "ta-backend"
+  }
+}
+
+resource "kubernetes_secret" "mongo_secrets" {
+  metadata {
+    name = "mongo-auth"
+    namespace = "ta-backend"
+  }
+  binary_data = jsondecode(var.mongo_secrets)
+  depends_on = [ kubernetes_namespace.ta_backend_namespace ]
+}
+
+resource "kubernetes_secret" "be_secrets" {
+  metadata {
+    name = "be-secrets"
+    namespace = "ta-backend"
+  }
+  data = jsondecode(var.be_secrets)
+  depends_on = [ kubernetes_namespace.ta_backend_namespace ]
+}
+
 provider "helm" {
   kubernetes {
     host                   = module.gke_auth.host
@@ -58,21 +113,6 @@ resource "helm_release" "argocd" {
   create_namespace = true
 }
 
-# resource "helm_release" "argocd-apps" {
-#   name  = "backend"
-
-#   repository       = "https://argoproj.github.io/argo-helm"
-#   chart            = "argocd-apps"
-#   namespace        = "argocd"
-#   version          = "1.6.0"
-
-#   values = [
-#     file("${path.module}/argocd/application.yaml")
-#   ]
-
-#   depends_on = [helm_release.argocd]
-# }
-
 provider "argocd" {
   core = true
 }
@@ -89,7 +129,7 @@ resource "argocd_project" "thirst_alert_argocd_project" {
 
   spec {
     description = "Thirst Alert IAC Project"
-    source_namespaces = ["ta-*"]
+    source_namespaces = ["ta-backend"]
     source_repos = [
       argocd_repository.thirst_alert_iac_repo.repo,
       "https://charts.bitnami.com/bitnami"
@@ -136,9 +176,9 @@ resource "argocd_application" "backend" {
         prune = true
         self_heal = true
       }
-      sync_options = ["CreateNamespace=True"]
     }
   }
+  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets ]
 }
 
 resource "argocd_application" "mongo" {
@@ -170,5 +210,6 @@ resource "argocd_application" "mongo" {
       namespace = "ta-backend"
     }
   }
+  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
 }
 

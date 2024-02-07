@@ -1,6 +1,6 @@
 resource "google_cloudbuildv2_connection" "cloudbuild_repo_connection" {
 	project = var.project.project_id
-  location = "europe-west3"
+  location = "europe-west1"
   name = "repo-connection"
 
   github_config {
@@ -18,7 +18,7 @@ resource "google_cloudbuildv2_repository" "thirst_alert_be" {
 }
 
 resource "google_artifact_registry_repository" "my-repo" {
-  location      = "europe-west3"
+  location      = "europe-west1"
   repository_id = "thirst-alert-be"
   description   = "A repository for thirst-alert backend artifacts."
   format        = "DOCKER"
@@ -28,7 +28,7 @@ resource "google_artifact_registry_repository" "my-repo" {
 resource "google_cloudbuild_trigger" "backend-trigger" {
 	name = "thirst-alert-be"
 	description = "Trigger for thirst-alert backend build"
-  location = "europe-west3"
+  location = "europe-west1"
 
   repository_event_config {
     repository = google_cloudbuildv2_repository.thirst_alert_be.id

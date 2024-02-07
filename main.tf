@@ -22,16 +22,6 @@ module "gke" {
   source = "./modules/gke"
 
   project    = local.project
-  # depends_on = [module.iam]
-}
-
-module "mongo" {
-  source = "./modules/mongo"
-
-  project = local.project
-	env = var.env
-	mongodb_atlas_public_key = module.secrets.mongodb_atlas_public_key
-	mongodb_atlas_private_key	= module.secrets.mongodb_atlas_private_key
-	mongodb_atlas_org_id = module.secrets.mongodb_atlas_org_id
-	mongodb_db_password = module.secrets.mongodb_db_password
+  mongo_secrets = module.secrets.mongodb_db_password
+  be_secrets = module.secrets.be_secrets
 }
