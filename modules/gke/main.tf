@@ -1,17 +1,13 @@
 terraform {
   required_providers {
-    argocd = {
-      source = "oboukili/argocd"
-      version = "6.0.3"
-    }
     kubernetes = {
       source = "hashicorp/kubernetes"
       version = "2.25.2"
     }
-    # kubectl = {
-    #   source  = "gavinbunney/kubectl"
-    #   version = ">= 1.7.0"
-    # }
+    argocd = {
+      source = "oboukili/argocd"
+      version = "6.0.3"
+    }
   }
 }
 
@@ -30,13 +26,18 @@ resource "google_container_cluster" "thirst_alert_dev_cluster" {
   release_channel {
     channel = "REGULAR"
   }
+}
 
-  # notification_config {
-  #   pubsub {
-  #     enabled = true
-  #     topic = google_pubsub_topic.gke_updates_topic.id
-  #   }
-  # }
+resource "google_compute_firewall" "backend_node_port" {
+  name    = "backend-node-port"
+  network = google_container_cluster.thirst_alert_dev_cluster.network
+
+  allow {
+    protocol = "tcp"
+    ports    = ["30000"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
 }
 
 module "gke_auth" {
@@ -47,23 +48,6 @@ module "gke_auth" {
   use_private_endpoint = false
   depends_on           = [google_container_cluster.thirst_alert_dev_cluster]
 }
-
-# provider "kubectl" {
-#   host                   = module.gke_auth.host
-#   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
-#   token                  = module.gke_auth.token
-#   load_config_file       = false
-# }
-
-# data "kubectl_file_documents" "be_namespace_doc" {
-#     content = file("${path.module}/k8s/be-namespace.yaml")
-# }
-
-# resource "kubectl_manifest" "be_namespace" {
-#     count     = length(data.kubectl_file_documents.be_namespace_doc.documents)
-#     yaml_body = element(data.kubectl_file_documents.be_namespace_doc.documents, count.index)
-#     override_namespace = "ta-backend"
-# }
 
 provider "kubernetes" {
   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
@@ -155,61 +139,70 @@ resource "argocd_project" "thirst_alert_argocd_project" {
   }
 }
 
-resource "argocd_application" "backend" {
-  metadata {
-    name = "backend"
-    namespace = "argocd"
-  }
-  spec {
-    project = "thirst-alert"
-    source {
-      repo_url = argocd_repository.thirst_alert_iac_repo.repo
-      path = "modules/gke/argocd/be"
-      target_revision = "HEAD"
-    }
-    destination {
-      server = "https://kubernetes.default.svc"
-      namespace = "ta-backend"
-    }
-    sync_policy {
-      automated {
-        prune = true
-        self_heal = true
-      }
-    }
-  }
-  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets ]
-}
+# resource "argocd_application" "backend" {
+#   metadata {
+#     name = "backend"
+#     namespace = "argocd"
+#   }pec {
+#     project = "thirst-alert"
+#     source {
+#       repo_url = argocd_repository.thirst_alert_iac_repo.repo
+#       path = "modules/gke/argocd/be"
+#       target_revision = "HEAD"
+#     }
+#     destination {
+#       server = "https://kubernetes.default.svc"
+#       namespace = "ta-backend"
+#     }
+#     sync_policy {
+#       automated {
+#         prune = true
+#         self_heal = true
+#       }
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets ]
+# }
 
-resource "argocd_application" "mongo" {
-  metadata {
-    name      = "mongo"
-    namespace = "argocd"
-  }
+# resource "argocd_application" "mongo" {
+#   metadata {
+#     name      = "mongo"
+#     namespace = "argocd"
+#   }
 
-  spec {
-    project = "thirst-alert"
+#   spec {
+#     project = "thirst-alert"
 
-    source {
-      repo_url        = "https://charts.bitnami.com/bitnami"
-      chart           = "mongodb"
-      target_revision = "14.8.0"
-      helm {
-        value_files = ["$values/modules/gke/argocd/mongo/mongo-values.yaml"]
-      }
-    }
+#     source {
+#       repo_url        = "https://charts.bitnami.com/bitnami"
+#       chart           = "mongodb"
+#       target_revision = "14.8.0"
+#       helm {
+#         value_files = ["$values/modules/gke/argocd/mongo/mongo-values.yaml"]
+#       }
+#     }
 
-    source {
-      repo_url        = argocd_repository.thirst_alert_iac_repo.repo
-      target_revision = "HEAD"
-      ref             = "values"
-    }
+#     source {
+#       repo_url        = argocd_repository.thirst_alert_iac_repo.repo
+#       target_revision = "HEAD"
+#       ref             = "values"
+#     }
 
-    destination {
-      server    = "https://kubernetes.default.svc"
-      namespace = "ta-backend"
-    }
-  }
-  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
-}
+#     destination {
+#       server    = "https://kubernetes.default.svc"
+#       namespace = "ta-backend"
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
+# }
+#   s
+
+# resource "helm_release" "tmp" {
+#   name  = "tmp"
+
+#   repository       = "https://SimonMisencik.github.io/helm-charts"
+#   chart            = "ubuntu"
+#   namespace        = "ta-backend"
+#   version          = "1.2.1"
+# }
 
