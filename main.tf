@@ -38,6 +38,25 @@ module "static-function" {
     filename => file("func/${filename}")
   }
   runtime = "python312"
+  entry_point = "sendToSlack"
   enable_versioning = true
   keep_versions = 2
+  environment_variables = {
+    MONGO_URIA = "mongodb://localhost:27017"
+  }
+  secret_environment_variables = [
+    {
+      key = "TEST"
+      project_id = "thirst-alert"
+      secret = "github-pat"
+      version = "latest"
+    },
+    {
+      key = "MONGO_URI"
+      project_id = "thirst-alert"
+      secret = "mongodb_db_password"
+      version = "latest"
+    }
+  ]
+  allow_unauthenticated_invocations = true
 }

@@ -27,5 +27,6 @@ def populateMessage(attributes):
     ]
   }
 
-def sendToSlack(event, _context):
+def sendToSlack(event):
   print("hallo")
+  print(event)

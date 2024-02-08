@@ -39,12 +39,6 @@ variable "entry_point" {
   default     = "main"
 }
 
-variable "trigger_http" {
-  description = "Whether this function shall be triggerable via HTTP. Cannot be used with event_trigger."
-  type        = bool
-  default     = null
-}
-
 variable "enable_versioning" {
   description = <<-EOT
     The bucket's versioning configuration.
@@ -64,15 +58,19 @@ variable "keep_versions" {
 }
 
 variable "event_trigger" {
-  description = "Specify an event trigger for the function. Cannot be used with trigger_http."
+  description = "Specify an event trigger for the function."
   type = object({
     event_type       = string
-    resource         = string
-    retry_on_failure = optional(bool)
+    pubsub_topic = optional(string)
+    retry_policy = optional(bool)
+    event_filters = optional(list(object({
+      attribute = string
+      value     = string
+      operator  = optional(string)
+    })))
   })
   default = {
     event_type = null
-    resource   = null
   }
 }
 
@@ -118,10 +116,10 @@ variable "timeout" {
   default     = 120
 }
 
-variable "available_memory_mb" {
-  description = "Maxiumum memory available to the script in MiB."
-  type        = number
-  default     = 128
+variable "available_memory" {
+  description = "Maximum memory available to the script in MiB."
+  type        = string
+  default     = "128Mi"
 }
 
 variable "max_instances" {
@@ -139,4 +137,10 @@ variable "environment_variables" {
   description = "Map of environment variables to pass to the function."
   type        = map(string)
   default     = {}
+}
+
+variable "secret_environment_variables" {
+  description = "Map of secret environment variables to pass to the function."
+  type        = list(map(any))
+  default     = null
 }

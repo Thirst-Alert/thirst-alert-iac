@@ -69,13 +69,12 @@ resource "google_service_account" "function_invoker" {
 resource "google_cloudfunctions2_function" "function" {
   project = local.project
   location  = var.region
-  name        = var.name
+  name        = var.name # use kebab-case!!!
   description = var.description
 
   build_config {
     runtime     = var.runtime
     entry_point = var.entry_point
-    environment_variables = var.environment_variables
     source {
       storage_source {
         bucket = google_storage_bucket.function_storage.name
@@ -86,50 +85,68 @@ resource "google_cloudfunctions2_function" "function" {
 
   service_config {
     max_instance_count = var.max_instances
-    available_memory = var.available_memory_mb
+    available_memory = var.available_memory
     timeout_seconds = var.timeout
     service_account_email = google_service_account.function_invoker.email
+    environment_variables = var.environment_variables
+    dynamic "secret_environment_variables" {
+      for_each = var.secret_environment_variables
+      content {
+        key        = secret_environment_variables.value.key
+        project_id = secret_environment_variables.value.project_id
+        secret     = secret_environment_variables.value.secret
+        version    = secret_environment_variables.value.version
+      }
+    }
+    ingress_settings = var.ingress_settings
+    vpc_connector                 = var.egress_connector
+    vpc_connector_egress_settings = var.egress_connector_settings
   }
 
-  
-
-  trigger_http = var.trigger_http
-
   dynamic "event_trigger" {
-    for_each = var.event_trigger.event_type == null ? [] : [1]
+    for_each = var.event_trigger != null ? [1] : []
 
     content {
-      event_type = var.event_trigger.event_type
-      resource   = var.event_trigger.resource
-
-      failure_policy {
-        retry = var.event_trigger.retry_on_failure == null ? false : var.event_trigger.retry_on_failure
+      event_type            = var.event_trigger.event_type
+      trigger_region        = var.region
+      pubsub_topic          = var.event_trigger.pubsub_topic
+      service_account_email = google_service_account.function_invoker.email
+      retry_policy          = var.event_trigger.retry_policy
+      dynamic event_filters {
+        for_each = var.event_trigger.event_filters != null ? var.event_trigger.event_filters : []
+        content {
+          attribute = event_filters.value.attribute
+          value     = event_filters.value.value
+          operator = event_filters.value.operator
+        }
       }
     }
   }
-
-  ingress_settings = var.ingress_settings
-
-  vpc_connector                 = var.egress_connector
-  vpc_connector_egress_settings = var.egress_connector_settings
 }
 
-# Allow the service account to invoke the function.
-resource "google_cloudfunctions_function_iam_member" "function_invoker_permission" {
-  project        = google_cloudfunctions_function.function.project
-  region         = google_cloudfunctions_function.function.region
-  cloud_function = google_cloudfunctions_function.function.name
-
-  role   = "roles/cloudfunctions.invoker"
+# WORKAROUND: https://github.com/hashicorp/terraform-provider-google/issues/15264
+resource "google_cloud_run_service_iam_member" "function_invoker_permission" {
+  location = google_cloudfunctions2_function.function.location
+  project        = google_cloudfunctions2_function.function.project
+  service = google_cloudfunctions2_function.function.name
+  role = "roles/run.invoker"
   member = "serviceAccount:${google_service_account.function_invoker.email}"
 }
 
-# Conditionally allow everyone to invoke the function
-resource "google_cloudfunctions_function_iam_member" "function_all_invoker" {
-  count          = var.allow_unauthenticated_invocations ? 1 : 0
-  project        = google_cloudfunctions_function.function.project
-  region         = google_cloudfunctions_function.function.region
-  cloud_function = google_cloudfunctions_function.function.name
-  role           = "roles/cloudfunctions.invoker"
+# WORKAROUND: https://github.com/hashicorp/terraform-provider-google/issues/15264
+resource "google_cloud_run_service_iam_member" "function_all_invoker" {
+  location = google_cloudfunctions2_function.function.location
+  project        = google_cloudfunctions2_function.function.project
+  service = google_cloudfunctions2_function.function.name
+  role = "roles/run.invoker"
   member         = "allUsers"
+}
+
+# Only allow the service account to access the secrets if secrets have been provided
+resource "google_secret_manager_secret_iam_member" "secret_accessor_permission" {
+  count         = var.secret_environment_variables != null ? length(var.secret_environment_variables) : 0
+  project = var.secret_environment_variables[count.index].project_id
+  secret_id     = var.secret_environment_variables[count.index].secret
+  role          = "roles/secretmanager.secretAccessor"
+  member        = "serviceAccount:${google_service_account.function_invoker.email}"
 }
