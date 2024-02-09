@@ -31,15 +31,20 @@ spec:
               name: be-secrets
               key: MONGO_URI
 ---
-apiVersion: v1
-kind: Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: backend-nodeport
+  name: api-ingress
+  namespace: ta-backend
 spec:
-  type: NodePort
-  selector:
-    app: backend
-  ports:
-  - port: 3000
-    targetPort: 3000
-    nodePort:  30000
+  rules:
+  - host: api.thirst-alert.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 3000
