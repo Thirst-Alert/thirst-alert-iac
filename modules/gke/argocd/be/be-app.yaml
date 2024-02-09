@@ -31,6 +31,19 @@ spec:
               name: be-secrets
               key: MONGO_URI
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: ta-backend
+spec:
+  selector:
+    app: backend
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
