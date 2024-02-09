@@ -87,6 +87,16 @@ provider "helm" {
   }
 }
 
+resource "helm_release" "ingress-nginx" {
+  name  = "ingress-nginx"
+
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  namespace        = "dnsconfig"
+  version          = "4.9.1"
+  create_namespace = true
+}
+
 resource "helm_release" "argocd" {
   name  = "argocd"
 

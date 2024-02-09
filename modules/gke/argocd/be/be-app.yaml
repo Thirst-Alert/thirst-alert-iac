@@ -50,6 +50,7 @@ metadata:
   name: api-ingress
   namespace: ta-backend
 spec:
+  ingressClassName: nginx
   rules:
   - host: api.thirst-alert.com
     http:
