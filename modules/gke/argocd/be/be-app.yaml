@@ -62,14 +62,3 @@ spec:
             name: backend
             port:
               number: 3000
-  - host: argocd.thirst-alert.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            namespace: argocd
-            port:
-              number: 443

@@ -107,6 +107,37 @@ resource "helm_release" "argocd" {
   create_namespace = true
 }
 
+resource "kubernetes_ingress_v1" "argocd_ingress" {
+  metadata {
+    name = "argocd-server-ingress"
+    namespace = "argocd"
+    # annotations = {
+    #   "kubernetes.io/ingressC" = "nginx"
+    #   # "nginx.ingress.kubernetes.io/rewrite-target" = "/"
+    # }
+  }
+  spec {
+    ingress_class_name = "nginx"
+    rule {
+      host = "argocd.thirst-alert.com"
+      http {
+        path {
+          path = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = "argocd-server"
+              port {
+                number = 443
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 provider "argocd" {
   core = true
 }
