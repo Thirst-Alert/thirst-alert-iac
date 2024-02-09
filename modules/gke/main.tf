@@ -1,17 +1,13 @@
 terraform {
   required_providers {
-    argocd = {
-      source = "oboukili/argocd"
-      version = "6.0.3"
-    }
     kubernetes = {
       source = "hashicorp/kubernetes"
       version = "2.25.2"
     }
-    # kubectl = {
-    #   source  = "gavinbunney/kubectl"
-    #   version = ">= 1.7.0"
-    # }
+    argocd = {
+      source = "oboukili/argocd"
+      version = "6.0.3"
+    }
   }
 }
 
@@ -30,13 +26,18 @@ resource "google_container_cluster" "thirst_alert_dev_cluster" {
   release_channel {
     channel = "REGULAR"
   }
+}
 
-  # notification_config {
-  #   pubsub {
-  #     enabled = true
-  #     topic = google_pubsub_topic.gke_updates_topic.id
-  #   }
-  # }
+resource "google_compute_firewall" "backend_node_port" {
+  name    = "backend-node-port"
+  network = google_container_cluster.thirst_alert_dev_cluster.network
+
+  allow {
+    protocol = "tcp"
+    ports    = ["30000"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
 }
 
 module "gke_auth" {
@@ -47,23 +48,6 @@ module "gke_auth" {
   use_private_endpoint = false
   depends_on           = [google_container_cluster.thirst_alert_dev_cluster]
 }
-
-# provider "kubectl" {
-#   host                   = module.gke_auth.host
-#   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
-#   token                  = module.gke_auth.token
-#   load_config_file       = false
-# }
-
-# data "kubectl_file_documents" "be_namespace_doc" {
-#     content = file("${path.module}/k8s/be-namespace.yaml")
-# }
-
-# resource "kubectl_manifest" "be_namespace" {
-#     count     = length(data.kubectl_file_documents.be_namespace_doc.documents)
-#     yaml_body = element(data.kubectl_file_documents.be_namespace_doc.documents, count.index)
-#     override_namespace = "ta-backend"
-# }
 
 provider "kubernetes" {
   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
@@ -178,7 +162,7 @@ resource "argocd_application" "backend" {
       }
     }
   }
-  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets ]
+  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets, argocd_application.mongo ]
 }
 
 resource "argocd_application" "mongo" {
@@ -212,4 +196,14 @@ resource "argocd_application" "mongo" {
   }
   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
 }
+
+
+# resource "helm_release" "tmp" {
+#   name  = "tmp"
+
+#   repository       = "https://SimonMisencik.github.io/helm-charts"
+#   chart            = "ubuntu"
+#   namespace        = "ta-backend"
+#   version          = "1.2.1"
+# }
 
