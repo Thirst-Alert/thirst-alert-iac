@@ -4,6 +4,10 @@ terraform {
       source = "hashicorp/kubernetes"
       version = "2.25.2"
     }
+    helm = {
+      source = "hashicorp/helm"
+      version = "2.12.0"
+    }
     argocd = {
       source = "oboukili/argocd"
       version = "6.0.3"
@@ -11,232 +15,263 @@ terraform {
   }
 }
 
-resource "google_container_cluster" "thirst_alert_dev_cluster" {
-  name                     = "${var.project.project_id}-dev"
-  deletion_protection = false
-  location                 = "europe-west3"
-  maintenance_policy {
-    recurring_window {
-      start_time = "2021-06-18T00:00:00Z"
-      end_time   = "2050-01-01T04:00:00Z"
-      recurrence = "FREQ=WEEKLY"
-    }
-  }
-  enable_autopilot = true
-  release_channel {
-    channel = "REGULAR"
-  }
-}
+# resource "google_container_cluster" "thirst_alert_dev_cluster" {
+#   name                     = "${var.project.project_id}-dev"
+#   deletion_protection = false
+#   location                 = "europe-west3"
+#   maintenance_policy {
+#     recurring_window {
+#       start_time = "2021-06-18T00:00:00Z"
+#       end_time   = "2050-01-01T04:00:00Z"
+#       recurrence = "FREQ=WEEKLY"
+#     }
+#   }
+#   enable_autopilot = true
+#   release_channel {
+#     channel = "REGULAR"
+#   }
+# }
 
-resource "google_compute_firewall" "backend_node_port" {
-  name    = "backend-node-port"
-  network = google_container_cluster.thirst_alert_dev_cluster.network
+# resource "google_compute_firewall" "backend_node_port" {
+#   name    = "backend-node-port"
+#   network = google_container_cluster.thirst_alert_dev_cluster.network
 
-  allow {
-    protocol = "tcp"
-    ports    = ["30000"]
-  }
+#   allow {
+#     protocol = "tcp"
+#     ports    = ["30000"]
+#   }
 
-  source_ranges = ["0.0.0.0/0"]
-}
+#   source_ranges = ["0.0.0.0/0"]
+# }
 
-module "gke_auth" {
-  source               = "terraform-google-modules/kubernetes-engine/google//modules/auth"
-  project_id           = var.project.project_id
-  cluster_name         = google_container_cluster.thirst_alert_dev_cluster.name
-  location             = google_container_cluster.thirst_alert_dev_cluster.location
-  use_private_endpoint = false
-  depends_on           = [google_container_cluster.thirst_alert_dev_cluster]
-}
+# module "gke_auth" {
+#   source               = "terraform-google-modules/kubernetes-engine/google//modules/auth"
+#   project_id           = var.project.project_id
+#   cluster_name         = google_container_cluster.thirst_alert_dev_cluster.name
+#   location             = google_container_cluster.thirst_alert_dev_cluster.location
+#   use_private_endpoint = false
+#   depends_on = [ google_container_cluster.thirst_alert_dev_cluster ]
+# }
 
-provider "kubernetes" {
-  cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
-  host                   = module.gke_auth.host
-  token                  = module.gke_auth.token
-}
+# provider "kubernetes" {
+#   cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
+#   host                   = module.gke_auth.host
+#   token                  = module.gke_auth.token
+# }
 
-resource "kubernetes_namespace" "ta_backend_namespace" {
-  metadata {
-    name = "ta-backend"
-  }
-}
+# NAMESPACES
 
-resource "kubernetes_secret" "mongo_secrets" {
-  metadata {
-    name = "mongo-auth"
-    namespace = "ta-backend"
-  }
-  binary_data = jsondecode(var.mongo_secrets)
-  depends_on = [ kubernetes_namespace.ta_backend_namespace ]
-}
+# resource "kubernetes_namespace" "ta_backend_namespace" {
+#   metadata {
+#     name = "ta-backend"
+#   }
+# }
 
-resource "kubernetes_secret" "be_secrets" {
-  metadata {
-    name = "be-secrets"
-    namespace = "ta-backend"
-  }
-  data = jsondecode(var.be_secrets)
-  depends_on = [ kubernetes_namespace.ta_backend_namespace ]
-}
+# resource "kubernetes_namespace" "argocd_namespace" {
+#   metadata {
+#     name = "argocd"
+#   }
+# }
 
-provider "helm" {
-  kubernetes {
-    host                   = module.gke_auth.host
-    cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
-    token                  = module.gke_auth.token
-  }
-}
+# resource "kubernetes_namespace" "dnsconfig_namespace" {
+#   metadata {
+#     name = "dnsconfig"
+#   }
+# }
 
-resource "helm_release" "ingress-nginx" {
-  name  = "ingress-nginx"
+# # SECRETS
 
-  repository       = "https://kubernetes.github.io/ingress-nginx"
-  chart            = "ingress-nginx"
-  namespace        = "dnsconfig"
-  version          = "4.9.1"
-  create_namespace = true
-}
+# resource "kubernetes_secret" "mongo_secrets" {
+#   metadata {
+#     name = "mongo-auth"
+#     namespace = "ta-backend"
+#   }
+#   binary_data = jsondecode(var.mongo_secrets)
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace ]
+# }
 
-resource "helm_release" "argocd" {
-  name  = "argocd"
+# resource "kubernetes_secret" "be_secrets" {
+#   metadata {
+#     name = "be-secrets"
+#     namespace = "ta-backend"
+#   }
+#   data = jsondecode(var.be_secrets)
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace ]
+# }
 
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  namespace        = "argocd"
-  version          = "5.53.12"
-  create_namespace = true
-}
+# # INGRESSES
 
-resource "kubernetes_ingress_v1" "argocd_ingress" {
-  metadata {
-    name = "argocd-server-ingress"
-    namespace = "argocd"
-    # annotations = {
-    #   "kubernetes.io/ingressC" = "nginx"
-    #   # "nginx.ingress.kubernetes.io/rewrite-target" = "/"
-    # }
-  }
-  spec {
-    ingress_class_name = "nginx"
-    rule {
-      host = "argocd.thirst-alert.com"
-      http {
-        path {
-          path = "/"
-          path_type = "Prefix"
-          backend {
-            service {
-              name = "argocd-server"
-              port {
-                number = 443
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
+# resource "kubernetes_ingress_v1" "argocd_ingress" {
+#   metadata {
+#     name = "argocd-server-ingress"
+#     namespace = "argocd"
+#     annotations = {
+#       "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
+#       "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP"
+#     }
+#   }
+#   spec {
+#     ingress_class_name = "nginx"
+#     tls {
+#       hosts = ["argocd.thirst-alert.com"]
+#       secret_name = "argocd-secret"
+#     }
+#     rule {
+#       host = "argocd.thirst-alert.com"
+#       http {
+#         path {
+#           path = "/"
+#           path_type = "Prefix"
+#           backend {
+#             service {
+#               name = "argocd-server"
+#               port {
+#                 number = 443
+#               }
+#             }
+#           }
+#         }
+#       }
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.argocd_namespace ]
+# }
 
-provider "argocd" {
-  core = true
-}
+# HELM RELEASES
 
-resource "argocd_repository" "thirst_alert_iac_repo" {
-  repo = "https://github.com/thirst-alert/thirst-alert-iac.git"
-}
+# provider "helm" {
+#   kubernetes {
+#     host                   = module.gke_auth.host
+#     cluster_ca_certificate = module.gke_auth.cluster_ca_certificate
+#     token                  = module.gke_auth.token
+#   }
+# }
 
-resource "argocd_project" "thirst_alert_argocd_project" {
-  metadata {
-    name = "thirst-alert"
-    namespace = "argocd"
-  }
+# resource "helm_release" "ingress-nginx" {
+#   name  = "ingress-nginx"
 
-  spec {
-    description = "Thirst Alert IAC Project"
-    source_namespaces = ["ta-backend"]
-    source_repos = [
-      argocd_repository.thirst_alert_iac_repo.repo,
-      "https://charts.bitnami.com/bitnami"
-    ]
-    destination {
-      server = "https://kubernetes.default.svc"
-      namespace = "ta-backend"
-    }
-    role {
-      name = "admin"
-      policies = [
-        "p, proj:thirst-alert:admin, applications, override, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, applications, sync, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, clusters, get, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, repositories, create, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, repositories, delete, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, repositories, update, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, logs, get, thirst-alert/*, allow",
-        "p, proj:thirst-alert:admin, exec, create, thirst-alert/*, allow",
-      ]
-    }
+#   repository       = "https://kubernetes.github.io/ingress-nginx"
+#   chart            = "ingress-nginx"
+#   namespace        = "dnsconfig"
+#   version          = "4.9.1"
+# }
 
-  }
-}
+# resource "helm_release" "argocd" {
+#   name  = "argocd"
 
-resource "argocd_application" "backend" {
-  metadata {
-    name = "backend"
-    namespace = "argocd"
-  }
-  spec {
-    project = "thirst-alert"
-    source {
-      repo_url = argocd_repository.thirst_alert_iac_repo.repo
-      path = "modules/gke/argocd/be"
-      target_revision = "HEAD"
-    }
-    destination {
-      server = "https://kubernetes.default.svc"
-      namespace = "ta-backend"
-    }
-    sync_policy {
-      automated {
-        prune = true
-        self_heal = true
-      }
-    }
-  }
-  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets, argocd_application.mongo ]
-}
+#   repository       = "https://argoproj.github.io/argo-helm"
+#   chart            = "argo-cd"
+#   namespace        = "argocd"
+#   version          = "5.53.12"
 
-resource "argocd_application" "mongo" {
-  metadata {
-    name      = "mongo"
-    namespace = "argocd"
-  }
+#   # set {
+#   #   name = "configs.params.server.insecure"
+#   #   value = "true"
+#   # }
+# }
 
-  spec {
-    project = "thirst-alert"
+# ARGOCD
 
-    source {
-      repo_url        = "https://charts.bitnami.com/bitnami"
-      chart           = "mongodb"
-      target_revision = "14.8.0"
-      helm {
-        value_files = ["$values/modules/gke/argocd/mongo/mongo-values.yaml"]
-      }
-    }
+# provider "argocd" {
+#   core = true
+# }
 
-    source {
-      repo_url        = argocd_repository.thirst_alert_iac_repo.repo
-      target_revision = "HEAD"
-      ref             = "values"
-    }
+# resource "argocd_repository" "thirst_alert_iac_repo" {
+#   repo = "https://github.com/thirst-alert/thirst-alert-iac.git"
+#   depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
+# }
 
-    destination {
-      server    = "https://kubernetes.default.svc"
-      namespace = "ta-backend"
-    }
-  }
-  depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
-}
+# resource "argocd_project" "thirst_alert_argocd_project" {
+#   metadata {
+#     name = "thirst-alert"
+#     namespace = "argocd"
+#   }
+
+#   spec {
+#     description = "Thirst Alert IAC Project"
+#     source_namespaces = ["ta-backend"]
+#     source_repos = [
+#       argocd_repository.thirst_alert_iac_repo.repo,
+#       "https://charts.bitnami.com/bitnami"
+#     ]
+#     destination {
+#       server = "https://kubernetes.default.svc"
+#       namespace = "ta-backend"
+#     }
+#     role {
+#       name = "admin"
+#       policies = [
+#         "p, proj:thirst-alert:admin, applications, override, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, applications, sync, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, clusters, get, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, repositories, create, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, repositories, delete, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, repositories, update, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, logs, get, thirst-alert/*, allow",
+#         "p, proj:thirst-alert:admin, exec, create, thirst-alert/*, allow",
+#       ]
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
+# }
+
+# resource "argocd_application" "backend" {
+#   metadata {
+#     name = "backend"
+#     namespace = "argocd"
+#   }
+#   spec {
+#     project = "thirst-alert"
+#     source {
+#       repo_url = argocd_repository.thirst_alert_iac_repo.repo
+#       path = "modules/gke/argocd/be"
+#       target_revision = "HEAD"
+#     }
+#     destination {
+#       server = "https://kubernetes.default.svc"
+#       namespace = "ta-backend"
+#     }
+#     sync_policy {
+#       automated {
+#         prune = true
+#         self_heal = true
+#       }
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.be_secrets, argocd_application.mongo ]
+# }
+
+# resource "argocd_application" "mongo" {
+#   metadata {
+#     name      = "mongo"
+#     namespace = "argocd"
+#   }
+
+#   spec {
+#     project = "thirst-alert"
+
+#     source {
+#       repo_url        = "https://charts.bitnami.com/bitnami"
+#       chart           = "mongodb"
+#       target_revision = "14.8.0"
+#       helm {
+#         value_files = ["$values/modules/gke/argocd/mongo/mongo-values.yaml"]
+#       }
+#     }
+
+#     source {
+#       repo_url        = argocd_repository.thirst_alert_iac_repo.repo
+#       target_revision = "HEAD"
+#       ref             = "values"
+#     }
+
+#     destination {
+#       server    = "https://kubernetes.default.svc"
+#       namespace = "ta-backend"
+#     }
+#   }
+#   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
+# }
 
 
 # resource "helm_release" "tmp" {
