@@ -22,6 +22,8 @@ module "gke" {
   source = "./modules/gke"
 
   project    = local.project
+  env = "dev"
+  cluster_name = "thirst-alert"
   mongo_secrets = module.secrets.mongodb_db_password
   be_secrets = module.secrets.be_secrets
 }

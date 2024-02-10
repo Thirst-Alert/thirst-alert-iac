@@ -35,3 +35,6 @@ terraform.rc
 
 .terraform.lock.hcl
 creds.json
+
+# Ignore DS_Store files
+.DS_Store

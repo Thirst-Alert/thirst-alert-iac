@@ -49,8 +49,14 @@ kind: Ingress
 metadata:
   name: api-ingress
   namespace: ta-backend
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.thirst-alert.com
+    secretName: cert-manager-private-key
   rules:
   - host: api.thirst-alert.com
     http:
