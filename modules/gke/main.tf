@@ -2,19 +2,19 @@ terraform {
   required_providers {
     kubernetes = {
       source = "hashicorp/kubernetes"
-      version = "2.25.2"
+      version = "~> 2.25.2"
     }
     kubectl = {
       source = "alekc/kubectl"
-      version = "2.0.4"
+      version = "~> 2.0.4"
     }
     helm = {
       source = "hashicorp/helm"
-      version = "2.12.0"
+      version = "~> 2.12.0"
     }
     argocd = {
       source = "oboukili/argocd"
-      version = "6.0.3"
+      version = "~> 6.0.3"
     }
   }
 }
@@ -147,15 +147,16 @@ resource "kubernetes_ingress_v1" "argocd_ingress" {
     name = "argocd-server-ingress"
     namespace = "argocd"
     annotations = {
-      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
-      "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP"
+      "cert-manager.io/cluster-issuer" = "cert-manager"
+      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "true"
+      "nginx.ingress.kubernetes.io/backend-protocol" = "HTTPS"
     }
   }
   spec {
     ingress_class_name = "nginx"
     tls {
       hosts = ["argocd.thirst-alert.com"]
-      secret_name = "argocd-secret"
+      secret_name = "cert-manager-private-key"
     }
     rule {
       host = "argocd.thirst-alert.com"
@@ -218,6 +219,33 @@ resource "helm_release" "argocd" {
   version          = "5.53.12"
 }
 
+resource "helm_release" "argocd_img_updater" {
+  name = "argocd-image-updater"
+
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argocd-image-updater"
+  namespace  = "argocd"
+  version    = "0.9.3"
+
+  values = [ "${file("${path.module}/argocd/img-updater/img-updater-values.yaml")}" ]
+}
+
+module "kubernetes-engine_workload-identity" {
+  source  = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
+  version = "30.0.0"
+
+  project_id = var.project.project_id
+  name = "argocd-image-updater"
+  cluster_name = module.gke.name
+  location = module.gke.location
+  use_existing_k8s_sa = true
+  annotate_k8s_sa = true
+  namespace = "argocd"
+  roles = [
+    "roles/artifactregistry.reader"
+  ]
+}
+
 # ARGOCD
 
 provider "argocd" {
@@ -267,6 +295,10 @@ resource "argocd_application" "backend" {
   metadata {
     name = "backend"
     namespace = "argocd"
+    annotations = {
+      "argocd-image-updater.argoproj.io/image-list" = "backend=europe-west1-docker.pkg.dev/thirst-alert/thirst-alert-be/backend"
+      "argocd-image-updater.argoproj.io/backend.allow-tags" = "regexp:.*dev.*"
+    }
   }
   spec {
     project = "thirst-alert"
@@ -320,14 +352,3 @@ resource "argocd_application" "mongo" {
   }
   depends_on = [ kubernetes_namespace.ta_backend_namespace, kubernetes_secret.mongo_secrets ]
 }
-
-
-# resource "helm_release" "tmp" {
-#   name  = "tmp"
-
-#   repository       = "https://SimonMisencik.github.io/helm-charts"
-#   chart            = "ubuntu"
-#   namespace        = "ta-backend"
-#   version          = "1.2.1"
-# }
-
