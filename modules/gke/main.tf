@@ -306,6 +306,9 @@ resource "argocd_application" "backend" {
       repo_url = argocd_repository.thirst_alert_iac_repo.repo
       path = "modules/gke/argocd/be"
       target_revision = "HEAD"
+      kustomize {
+        
+      }
     }
     destination {
       server = "https://kubernetes.default.svc"
