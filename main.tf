@@ -26,4 +26,5 @@ module "gke" {
   cluster_name = "thirst-alert"
   mongo_secrets = module.secrets.mongodb_db_password
   be_secrets = module.secrets.be_secrets
+  gitops_argocd_image_updater_key = module.secrets.gitops_argocd_image_updater_key
 }

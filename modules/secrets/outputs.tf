@@ -9,3 +9,7 @@ output mongodb_db_password {
 output be_secrets {
   value = data.google_secret_manager_secret_version.be_secrets_secret_version.secret_data
 }
+
+output gitops_argocd_image_updater_key {
+  value = data.google_secret_manager_secret_version.gitops_argocd_image_updater_key_secret_version.secret_data
+}

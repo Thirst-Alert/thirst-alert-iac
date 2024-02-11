@@ -5,6 +5,12 @@ config:
       prefix: europe-west1-docker.pkg.dev
       credentials: ext:/scripts/gke-workload-identity-auth.sh
       credsexpire: 30m
+  gitCommitTemplate: |
+    build: automatic update of {{ .AppName }}
+
+    {{ range .AppChanges -}}
+    updates image {{ .Image }} tag '{{ .OldTag }}' to '{{ .NewTag }}'
+    {{ end -}}
 authScripts:
   enabled: true
   scripts:

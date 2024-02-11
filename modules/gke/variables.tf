@@ -40,3 +40,8 @@ variable be_secrets {
   type = string
   default = ""
 }
+
+variable gitops_argocd_image_updater_key {
+  type = string
+  default = ""
+}

@@ -36,3 +36,16 @@ resource "google_secret_manager_secret" "be_secrets" {
 data "google_secret_manager_secret_version" "be_secrets_secret_version" {
   secret = google_secret_manager_secret.be_secrets.secret_id
 }
+
+resource "google_secret_manager_secret" "gitops_argocd_image_updater_key" {
+	project =  var.project.project_id
+	secret_id = "gitops-argocd-image-updater-key"
+
+	replication {
+		auto {}
+	}
+}
+
+data "google_secret_manager_secret_version" "gitops_argocd_image_updater_key_secret_version" {
+  secret = google_secret_manager_secret.gitops_argocd_image_updater_key.secret_id
+}

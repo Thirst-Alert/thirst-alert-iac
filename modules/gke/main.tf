@@ -140,6 +140,17 @@ resource "kubernetes_secret" "be_secrets" {
   depends_on = [ kubernetes_namespace.ta_backend_namespace ]
 }
 
+resource "kubernetes_secret" "argocd_image_updater_secret" {
+  metadata {
+    name = "argocd-image-updater-secret"
+    namespace = "argocd"
+  }
+  data = {
+    "argocd.token" = argocd_project_token.argocd_image_updater_token.jwt
+  }
+  depends_on = [ kubernetes_namespace.argocd_namespace ]
+}
+
 # INGRESSES
 
 resource "kubernetes_ingress_v1" "argocd_ingress" {
@@ -257,6 +268,19 @@ resource "argocd_repository" "thirst_alert_iac_repo" {
   depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
 }
 
+resource "argocd_repository" "thirst_alert_gitops_repo" {
+  repo = "git@github.com:thirst-alert/thirst-alert-gitops.git"
+  ssh_private_key = var.gitops_argocd_image_updater_key
+  depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
+}
+
+resource "argocd_repository" "mongo_bitnami_repo" {
+  repo = "https://charts.bitnami.com/bitnami"
+  name = "mongodb"
+  type = "helm"
+  depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
+}
+
 resource "argocd_project" "thirst_alert_argocd_project" {
   metadata {
     name = "thirst-alert"
@@ -266,10 +290,7 @@ resource "argocd_project" "thirst_alert_argocd_project" {
   spec {
     description = "Thirst Alert IAC Project"
     source_namespaces = ["ta-backend"]
-    source_repos = [
-      argocd_repository.thirst_alert_iac_repo.repo,
-      "https://charts.bitnami.com/bitnami"
-    ]
+    source_repos = ["*"]
     destination {
       server = "https://kubernetes.default.svc"
       namespace = "ta-backend"
@@ -291,6 +312,13 @@ resource "argocd_project" "thirst_alert_argocd_project" {
   depends_on = [ kubernetes_namespace.argocd_namespace, helm_release.argocd ]
 }
 
+resource "argocd_project_token" "argocd_image_updater_token" {
+  project      = "thirst-alert"
+  role         = "admin"
+  description  = "argocd-image-updater token"
+  depends_on = [ argocd_project.thirst_alert_argocd_project ]
+}
+
 resource "argocd_application" "backend" {
   metadata {
     name = "backend"
@@ -298,17 +326,18 @@ resource "argocd_application" "backend" {
     annotations = {
       "argocd-image-updater.argoproj.io/image-list" = "backend=europe-west1-docker.pkg.dev/thirst-alert/thirst-alert-be/backend"
       "argocd-image-updater.argoproj.io/backend.allow-tags" = "regexp:.*dev.*"
+      "argocd-image-updater.argoproj.io/backend.update-strategy" = "semver"
+      "argocd-image-updater.argoproj.io/write-back-method" = "git:repocreds"
+      "argocd-image-updater.argoproj.io/write-back-target" = "kustomization"
+      "argocd-image-updater.argoproj.io/git-branch" = "main"
     }
   }
   spec {
     project = "thirst-alert"
     source {
-      repo_url = argocd_repository.thirst_alert_iac_repo.repo
-      path = "modules/gke/argocd/be"
+      repo_url = argocd_repository.thirst_alert_gitops_repo.repo
+      path = "overlays/dev/backend"
       target_revision = "HEAD"
-      kustomize {
-        
-      }
     }
     destination {
       server = "https://kubernetes.default.svc"
