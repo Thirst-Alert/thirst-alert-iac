@@ -1,5 +1,10 @@
 variable "name" {
-  description = "The name of the function."
+  description = <<-EOT
+		The name of the function. Please use kebab-case (e.g. my-function-name)! There's
+		currently no support by the google_cloudfunctions2_function_iam_policy resource for
+		the role needed by service accounts to actually invoke the function, so a workaround
+		had to be used.
+	EOT
   type        = string
 }
 
@@ -26,11 +31,13 @@ variable "runtime" {
     https://cloud.google.com/functions/docs/runtime-support
   EOT
   type        = string
+  default = null
 }
 
-variable source_files {
+variable "source_files" {
   description = "The source files for this function, in the form of file_name => file_content."
-  type = map(any)
+  type        = map(any)
+  default = null
 }
 
 variable "entry_point" {
@@ -60,9 +67,9 @@ variable "keep_versions" {
 variable "event_trigger" {
   description = "Specify an event trigger for the function."
   type = object({
-    event_type       = string
+    event_type   = string
     pubsub_topic = optional(string)
-    retry_policy = optional(bool)
+    retry_policy = optional(string)
     event_filters = optional(list(object({
       attribute = string
       value     = string
@@ -77,7 +84,7 @@ variable "event_trigger" {
 variable "ingress_settings" {
   description = <<-EOT
     Where to allow ingress traffic from, see:
-    https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#ingress_settings
+    [Ingress settings](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#ingress_settings)
   EOT
   type        = string
   default     = "ALLOW_ALL"
@@ -87,7 +94,7 @@ variable "egress_connector" {
   type        = string
   description = <<-EOT
     The VPC Connector that egress traffic is routed through. See:
-    https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#vpc_connector
+    [VPC Connector](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#vpc_connector)
 EOT
   default     = ""
 }
@@ -96,7 +103,7 @@ variable "egress_connector_settings" {
   type        = string
   description = <<-EOT
     Which egress traffic should be routed through the VPC connector. See:
-    https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#vpc_connector_egress_settings
+    [Egress settings](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function#vpc_connector_egress_settings)
   EOT
   default     = null
 }
@@ -119,7 +126,7 @@ variable "timeout" {
 variable "available_memory" {
   description = "Maximum memory available to the script in MiB."
   type        = string
-  default     = "128Mi"
+  default     = "256M"
 }
 
 variable "max_instances" {
@@ -142,5 +149,11 @@ variable "environment_variables" {
 variable "secret_environment_variables" {
   description = "Map of secret environment variables to pass to the function."
   type        = list(map(any))
-  default     = null
+  default     = []
+}
+
+variable "detached_deployment" {
+  description = "Manage function's source files manually, detaching the bucket content lifecycle from Terraform."
+  type = bool
+  default = false
 }
