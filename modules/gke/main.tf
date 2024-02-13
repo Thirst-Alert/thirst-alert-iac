@@ -166,11 +166,11 @@ resource "kubernetes_ingress_v1" "argocd_ingress" {
   spec {
     ingress_class_name = "nginx"
     tls {
-      hosts = ["argocd.thirst-alert.com"]
+      hosts = ["argocd.dev.thirst-alert.com"]
       secret_name = "cert-manager-private-key"
     }
     rule {
-      host = "argocd.thirst-alert.com"
+      host = "argocd.dev.thirst-alert.com"
       http {
         path {
           path = "/"
