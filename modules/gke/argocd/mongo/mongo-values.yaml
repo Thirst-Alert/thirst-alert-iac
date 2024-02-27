@@ -1,3 +1,5 @@
+architecture: replicaset
+replicaCount: 1
 auth:
   usernames: [ta-dev]
   databases: [ta-dev]
