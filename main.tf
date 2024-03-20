@@ -28,3 +28,26 @@ module "gke" {
   be_secrets = module.secrets.be_secrets
   gitops_argocd_image_updater_key = module.secrets.gitops_argocd_image_updater_key
 }
+
+module "bucket" {
+  source  = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
+  version = "~> 5.0"
+
+  name       = "thirst-alert-public-assets"
+  project_id = local.project.project_id
+  location   = "europe-west1"
+  iam_members = [{
+    role   = "roles/storage.objectViewer"
+    member = "allUsers"
+  }]
+}
+
+resource "google_storage_bucket_object" "cch_data_folders" {
+  for_each = toset([
+    "thirst-alert-sensor-repo/",
+    "thirst-alert-assets/"
+  ])
+  name     = each.value
+  bucket   = module.bucket.name
+  content  = " "
+}
