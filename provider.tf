@@ -12,7 +12,7 @@ terraform {
 }
 
 provider "google" {
-  project = "thirst-alert"
+  project = "thirst-alert-app"
   region  = "europe-west3"
   zone    = "europe-west3-b"
 }

@@ -324,7 +324,7 @@ resource "argocd_application" "backend" {
     name = "backend"
     namespace = "argocd"
     annotations = {
-      "argocd-image-updater.argoproj.io/image-list" = "backend=europe-west1-docker.pkg.dev/thirst-alert/thirst-alert-be/backend"
+      "argocd-image-updater.argoproj.io/image-list" = "backend=europe-west1-docker.pkg.dev/thirst-alert-app/thirst-alert-be/backend"
       "argocd-image-updater.argoproj.io/backend.allow-tags" = "regexp:.*dev.*"
       "argocd-image-updater.argoproj.io/backend.update-strategy" = "semver"
       "argocd-image-updater.argoproj.io/write-back-method" = "git:repocreds"
