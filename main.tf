@@ -36,30 +36,6 @@ resource "google_service_account" "url_signer" {
   description = "Service account that creates GCS signed URLs for the images bucket"
 }
 
-# resource "google_storage_bucket_iam_member" "ta_url_signer_sa_get" {
-#   bucket = module.bucket["thirst-alert-sensor-images"].name
-#   role = "roles/storage.objectViewer"
-#   member = google_service_account.url_signer.member
-# }
-
-# resource "google_storage_bucket_iam_member" "ta_url_signer_sa_put" {
-#   bucket = module.bucket["thirst-alert-sensor-images"].name
-#   role = "roles/storage.objectViewer"
-#   member = google_service_account.url_signer.member
-# }
-
-# module "service-accounts" {
-#   source  = "terraform-google-modules/service-accounts/google"
-#   version = "4.2.2"
-
-#   project_id = local.project.project_id
-#   description = "Service account that creates GCS signed URLs for the images bucket"
-#   display_name = "ta-url-signer-sa"
-#   project_roles = [
-#     "${local.project.project_id}=>storage.",
-#   ]
-# }
-
 module "bucket" {
   for_each = local.buckets
   source  = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
@@ -69,6 +45,7 @@ module "bucket" {
   project_id = local.project.project_id
   location   = "europe-west1"
   iam_members = each.value.iam_members
+  versioning = each.value.versioning
 }
 
 resource "google_storage_bucket_object" "assets_folders" {

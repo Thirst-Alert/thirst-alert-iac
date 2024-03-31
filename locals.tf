@@ -21,6 +21,7 @@ locals {
         role   = "roles/storage.objectViewer"
         member = "allUsers"
       }]
+      versioning = true
     }
     "thirst-alert-sensor-images" = {
       iam_members = [
@@ -29,6 +30,7 @@ locals {
           member = google_service_account.url_signer.member
         }
       ]
+      versioning = false
     }
   }
 }
